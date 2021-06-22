@@ -47,6 +47,6 @@ if __name__ == '__main__':
 	while True:
 		message = client.recieve_message()
 
-		print(f'{message} {time.strftime("%H:%M:%S")}')
+		print(f'{message.decode()} {time.strftime("%H:%M:%S")}')
 
 	# client.stop() somewhere

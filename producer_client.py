@@ -40,8 +40,10 @@ class producer_client:
 			else:
 				address = message_json['dest-addr']
 
+			print(address)
+
 			ciphertext = servers[i]['public-key'].encrypt(
-				socket.inet_aton(servers[i]['address'][0]) + servers[i]['address'][1].to_bytes(2, 'big') + ciphertext,
+				socket.inet_aton(address[0]) + address[1].to_bytes(2, 'big') + ciphertext,
 				padding.OAEP(
 					mgf=padding.MGF1(algorithm=hashes.SHA256()),
 					algorithm=hashes.SHA256(),
@@ -55,6 +57,8 @@ class producer_client:
 			'remaining-rounds': message_json['round']
 		})
 
+		print("added", ciphertext, "to queue")
+
 		return ciphertext
 
 	def __send_messages(self):
@@ -64,11 +68,12 @@ class producer_client:
 			new_messages_queue = []
 
 			for message in self.__messages_queue:
-				message['remaining-rounds'] -= 1
 
 				if message['remaining-rounds'] == 0:
+					print("sending ", message['content'], "to", message['address'])
 					self.__sock.sendto(message['content'], message['address'])
 				else:
+					message['remaining-rounds'] -= 1
 					new_messages_queue.append(message)
 
 			self.__messages_queue = new_messages_queue
@@ -100,7 +105,7 @@ def generate_message_json(line, servers): # servers is a list of tuples (IP, POR
 	)
 	message['key'] = base64.urlsafe_b64encode(kdf.derive(props[3].encode())) 
 
-	message['dest-addr'] = (props[5], props[6])
+	message['dest-addr'] = (props[5], int(props[6][:-1]))
 
 	return message
 
@@ -124,4 +129,4 @@ if __name__ == '__main__':
 	for message in messages:
 		client.send_message(generate_message_json(message, servers))
 
-	client.stop()
+	# client.stop()

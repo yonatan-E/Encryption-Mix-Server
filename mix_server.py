@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 
 class mix_server:
 
-	BUFFER_SIZE = 1024
+	BUFFER_SIZE = 4096
 	MESSAGE_SENDING_INTERVAL = 1
 
 	def __init__(self, private_key):
@@ -30,9 +30,9 @@ class mix_server:
 		self.__sender_thread.cancel()
 
 	def recieve_message(self):
-		data = self.__sock.recv(self.BUFFER_SIZE)
+		data, address = self.__sock.recvfrom(self.BUFFER_SIZE)
 
-		print("recieved")
+		print("recieved ", address)
 
 		plaintext = self.__private_key.decrypt(
 			data,
@@ -43,8 +43,11 @@ class mix_server:
 			)
 		)
 
+		print('address', (socket.inet_ntoa(plaintext[0:4]), int.from_bytes(plaintext[4:6], 'big')),
+			'content', plaintext[6:])
+
 		self.__messages_queue.append({
-			'address': (socket.inet_ntoa(plaintext[0:4]), plaintext[4:6].from_bytes(2, 'big')),
+			'address': (socket.inet_ntoa(plaintext[0:4]), int.from_bytes(plaintext[4:6], 'big')),
 			'content': plaintext[6:]
 		})
 
