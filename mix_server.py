@@ -2,8 +2,6 @@ import socket
 import sys
 import time
 import threading
-
-import struct
 import random
 
 from cryptography.hazmat.backends import default_backend
@@ -16,27 +14,23 @@ class mix_server:
 	BUFFER_SIZE = 1024
 	MESSAGE_SENDING_INTERVAL = 1
 
-	'''
-	should get the private key using:
-
-	with open(private_key_file, 'rb') as pem:
-        pemlines = pem.read()
-    private_key = load_pem_private_key(pemlines, None, default_backend())
-	'''
-
 	def __init__(self, private_key):
 		self.__private_key = private_key
 		self.__messages_queue = []
 
-	def start(self):
+	def start(self, ip, port):
 		self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.__sock.bind((ip, port))
 
-		self.__sender_thread = threading.Timer(MESSAGE_SENDING_INTERVAL, self.__send_messages)
+		self.__sender_thread = threading.Timer(self.MESSAGE_SENDING_INTERVAL, self.__send_messages)
 		self.__sender_thread.start()
 
-	def recieve_message(self, ip, port):
-		data = sock.recv(BUFFER_SIZE)
+	def stop(self):
+		self.__sock.close()
+		self.__sender_thread.cancel()
+
+	def recieve_message(self):
+		data = self.__sock.recv(self.BUFFER_SIZE)
 
 		plaintext = self.__private_key.decrypt(
 			data,
@@ -48,13 +42,13 @@ class mix_server:
 		)
 
 		self.__messages_queue.append({
-			'address': (socket.inet_ntoa(plaintext[0:4]), struct.unpack('H', plaintext[4:6])),
+			'address': (socket.inet_ntoa(plaintext[0:4]), plaintext[4:6].from_bytes(2, 'big')),
 			'content': plaintext[6:]
 		})
 
 	def __send_messages(self):
 		while True:
-			time.sleep(MESSAGE_SENDING_INTERVAL)
+			time.sleep(self.MESSAGE_SENDING_INTERVAL)
 
 			random.shuffle(self.__messages_queue)
 			for message in self.__messages_queue:
@@ -63,7 +57,15 @@ class mix_server:
 			self.__messages_queue = []
 
 if __name__ == '__main__':
-	if len(sys.argv) < 2:
+	if len(sys.argv) < 3:
 		exit(1)
 
-	# need to figure out if the server should create key files
+	with open(f'sk{int(sys.argv[1])}.pem', 'rb') as pem:
+	    pemlines = pem.read()
+	private_key = load_pem_private_key(pemlines, None, default_backend())
+
+	server = mix_server(private_key)
+	server.start('localhost', int(sys.argv[2]))
+
+	while True:
+		server.recieve_message()

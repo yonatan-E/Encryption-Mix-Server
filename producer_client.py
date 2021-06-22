@@ -3,15 +3,19 @@ import time
 import sys
 import threading
 
-import struct
-
 import base64
 from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+SERVERS_FILE = 'ips.txt'
+
 class producer_client:
+
+	MESSAGE_SENDING_INTERVAL = 1
 
 	def __init__(self):
 		self.__messages_queue = []
@@ -19,7 +23,7 @@ class producer_client:
 	def start(self):
 		self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-		self.__sender_thread = threading.Timer(MESSAGE_SENDING_INTERVAL, self.__send_messages)
+		self.__sender_thread = threading.Timer(self.MESSAGE_SENDING_INTERVAL, self.__send_messages)
 		self.__sender_thread.start()
 
 	def stop(self):
@@ -28,15 +32,16 @@ class producer_client:
 
 	def send_message(self, message_json): # message should be in format {content, servers (list of tuples (IP, PORT)), round, key, dest-addr (IP, PORT)}
 		ciphertext = Fernet(message_json['key']).encrypt(message_json['content'].encode())
-
-		for i in reversed(range(0, len(message_json['servers']))):
-			if i < len(message_json['servers']) - 1:
-				address = message_json['servers'][i + 1]['address']
+		print(5)
+		servers = message_json['servers']
+		for i in reversed(range(0, len(servers))):
+			if i < len(servers) - 1:
+				address = servers[i + 1]['address']
 			else:
 				address = message_json['dest-addr']
 
-			ciphertext = server['public_key'].encrypt(
-				socket.inet_aton(server['address'][0]) + struct.pack('H', server['address'][1]) + ciphertext,
+			ciphertext = servers[i]['public-key'].encrypt(
+				socket.inet_aton(servers[i]['address'][0]) + servers[i]['address'][1].to_bytes(2, 'big') + ciphertext,
 				padding.OAEP(
 					mgf=padding.MGF1(algorithm=hashes.SHA256()),
 					algorithm=hashes.SHA256(),
@@ -46,7 +51,7 @@ class producer_client:
 
 		self.__messages_queue.append({
 			'content': ciphertext,
-			'address': message_json['servers'][0]['address'],
+			'address': servers[0]['address'],
 			'remaining-rounds': message_json['round']
 		})
 
@@ -54,7 +59,7 @@ class producer_client:
 
 	def __send_messages(self):
 		while True:
-			time.sleep(MESSAGE_SENDING_INTERVAL)
+			time.sleep(self.MESSAGE_SENDING_INTERVAL)
 
 			new_messages_queue = []
 
@@ -69,10 +74,10 @@ class producer_client:
 			self.__messages_queue = new_messages_queue
 
 
-def generate_message_json(self, line, servers): # servers is a list of tuples (IP, PORT)
+def generate_message_json(line, servers): # servers is a list of tuples (IP, PORT)
 	message = {}
 
-	props = message.split(' ')
+	props = line.split(' ')
 
 	message['content'] = props[0]
 
@@ -84,29 +89,39 @@ def generate_message_json(self, line, servers): # servers is a list of tuples (I
 
 		message['servers'].append({'address': servers[int(index) - 1], 'public-key': public_key})
 
-	message['round'] = props[2]
+	message['round'] = int(props[2])
 
 	kdf = PBKDF2HMAC(
 		algorithm=hashes.SHA256(),
 		length=32,
-		salt=props[4],
-		iterations=100000
+		salt=props[4].encode(),
+		iterations=100000,
+		backend=default_backend()
 	)
-	message['key'] = base64.urlsafe_b64encode(kdf.derive(props[3])) 
-	
+	message['key'] = base64.urlsafe_b64encode(kdf.derive(props[3].encode())) 
+
 	message['dest-addr'] = (props[5], props[6])
+
+	return message
 
 if __name__ == '__main__':
 	if len(sys.argv) < 2:
 		exit(1)
 
-	with open(sys.argv[1], 'r+') as messages_file:
+	servers = []
+
+	with open(SERVERS_FILE, 'r+') as servers_file:
+		for line in servers_file:
+			props = line.split(' ')
+			servers.append((props[0], int(props[1])))
+
+	with open(f'messages{sys.argv[1]}.txt', 'r+') as messages_file:
 		messages = messages_file.read().split('\n')
 
 	client = producer_client()
 	client.start()
 
 	for message in messages:
-		client.send_message(generate_message_json(message))
+		client.send_message(generate_message_json(message, servers))
 
 	client.stop()
