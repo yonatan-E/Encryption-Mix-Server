@@ -62,21 +62,20 @@ class producer_client:
 		return ciphertext
 
 	def __send_messages(self):
-		while True:
-			time.sleep(self.MESSAGE_SENDING_INTERVAL)
+		time.sleep(self.MESSAGE_SENDING_INTERVAL)
 
-			new_messages_queue = []
+		new_messages_queue = []
 
-			for message in self.__messages_queue:
+		for message in self.__messages_queue:
 
-				if message['remaining-rounds'] == 0:
-					print("sending ", message['content'], "to", message['address'])
-					self.__sock.sendto(message['content'], message['address'])
-				else:
-					message['remaining-rounds'] -= 1
-					new_messages_queue.append(message)
+			if message['remaining-rounds'] == 0:
+				print("sending ", message['content'], "to", message['address'])
+				self.__sock.sendto(message['content'], message['address'])
+			else:
+				message['remaining-rounds'] -= 1
+				new_messages_queue.append(message)
 
-			self.__messages_queue = new_messages_queue
+		self.__messages_queue = new_messages_queue
 
 
 def generate_message_json(line, servers): # servers is a list of tuples (IP, PORT)
@@ -128,5 +127,4 @@ if __name__ == '__main__':
 	
 	for message in messages:
 		client.send_message(generate_message_json(message, servers))
-
-	# client.stop()
+		
