@@ -32,8 +32,6 @@ class mix_server:
 	def recieve_message(self):
 		data, address = self.__sock.recvfrom(self.BUFFER_SIZE)
 
-		print("recieved ", address)
-
 		plaintext = self.__private_key.decrypt(
 			data,
 			padding.OAEP(
@@ -42,9 +40,6 @@ class mix_server:
 				label=None
 			)
 		)
-
-		print('address', (socket.inet_ntoa(plaintext[0:4]), int.from_bytes(plaintext[4:6], 'big')),
-			'content', plaintext[6:])
 
 		self.__messages_queue.append({
 			'address': (socket.inet_ntoa(plaintext[0:4]), int.from_bytes(plaintext[4:6], 'big')),

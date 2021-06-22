@@ -40,8 +40,6 @@ class producer_client:
 			else:
 				address = message_json['dest-addr']
 
-			print(address)
-
 			ciphertext = servers[i]['public-key'].encrypt(
 				socket.inet_aton(address[0]) + address[1].to_bytes(2, 'big') + ciphertext,
 				padding.OAEP(
@@ -57,8 +55,6 @@ class producer_client:
 			'remaining-rounds': message_json['round']
 		})
 
-		print("added", ciphertext, "to queue")
-
 		return ciphertext
 
 	def __send_messages(self):
@@ -69,7 +65,6 @@ class producer_client:
 		for message in self.__messages_queue:
 
 			if message['remaining-rounds'] == 0:
-				print("sending ", message['content'], "to", message['address'])
 				self.__sock.sendto(message['content'], message['address'])
 			else:
 				message['remaining-rounds'] -= 1
