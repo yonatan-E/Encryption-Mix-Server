@@ -105,7 +105,7 @@ def generate_message_json(line, servers): # servers is a list of tuples (IP, POR
 	)
 	message['key'] = base64.urlsafe_b64encode(kdf.derive(props[3].encode())) 
 
-	message['dest-addr'] = (props[5], int(props[6][:-1]))
+	message['dest-addr'] = (props[5], int(props[6]))
 
 	return message
 
