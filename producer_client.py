@@ -32,7 +32,7 @@ class producer_client:
 
 	def send_message(self, message_json): # message should be in format {content, servers (list of tuples (IP, PORT)), round, key, dest-addr (IP, PORT)}
 		ciphertext = Fernet(message_json['key']).encrypt(message_json['content'].encode())
-		print(5)
+
 		servers = message_json['servers']
 		for i in reversed(range(0, len(servers))):
 			if i < len(servers) - 1:
@@ -116,11 +116,11 @@ if __name__ == '__main__':
 			servers.append((props[0], int(props[1])))
 
 	with open(f'messages{sys.argv[1]}.txt', 'r+') as messages_file:
-		messages = messages_file.read().split('\n')
+		messages = [line for line in messages_file]
 
 	client = producer_client()
 	client.start()
-
+	
 	for message in messages:
 		client.send_message(generate_message_json(message, servers))
 
