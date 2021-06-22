@@ -42,7 +42,7 @@ if __name__ == '__main__':
 	key = base64.urlsafe_b64encode(kdf.derive(sys.argv[1].encode()))
 
 	client = consumer_client(key)
-	client.start('localhost', sys.argv[3])
+	client.start('localhost', int(sys.argv[3]))
 	
 	while True:
 		message = client.recieve_message()

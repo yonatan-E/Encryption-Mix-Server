@@ -32,6 +32,8 @@ class mix_server:
 	def recieve_message(self):
 		data = self.__sock.recv(self.BUFFER_SIZE)
 
+		print("recieved")
+
 		plaintext = self.__private_key.decrypt(
 			data,
 			padding.OAEP(
