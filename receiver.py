@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 class consumer_client:
 
-	BUFFER_SIZE = 1024
+	BUFFER_SIZE = 8192
 
 	def __init__(self, key):
 		self.__key = key
@@ -53,4 +53,3 @@ if __name__ == '__main__':
 		message = client.recieve_message()
 
 		print(f'{message.decode()} {time.strftime("%H:%M:%S")}')
-		
