@@ -20,19 +20,23 @@ class mix_server:
 		self.__messages_queue = []
 
 	def start(self, ip, port):
+		# opening a socket and binding it
 		self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.__sock.bind((ip, port))
 
+		# starting a thread to run in background and clear the messages queue every time interval
 		self.__sender_thread = threading.Timer(self.MESSAGE_SENDING_INTERVAL, self.__send_messages)
 		self.__sender_thread.start()
 
 	def stop(self):
+		# closing the socket and canceling the thread
 		self.__sock.close()
 		self.__sender_thread.cancel()
 
 	def recieve_message(self):
 		data, address = self.__sock.recvfrom(self.BUFFER_SIZE)
 
+		# decrypting the recieved message with the server's private key
 		plaintext = self.__private_key.decrypt(
 			data,
 			padding.OAEP(
@@ -42,6 +46,7 @@ class mix_server:
 			)
 		)
 
+		# appending the message to the sending queue
 		self.__messages_queue.append({
 			'address': (socket.inet_ntoa(plaintext[0:4]), int.from_bytes(plaintext[4:6], 'big')),
 			'content': plaintext[6:]
@@ -49,9 +54,12 @@ class mix_server:
 
 	def __send_messages(self):
 		while True:
+			# sleeping for a time interval
 			time.sleep(self.MESSAGE_SENDING_INTERVAL)
 
+			# shuffeling the pending messages queue
 			random.shuffle(self.__messages_queue)
+			# sending all of the pending messages in the sending queue
 			for message in self.__messages_queue:
 				self.__sock.sendto(message['content'], message['address'])
 
@@ -61,10 +69,12 @@ if __name__ == '__main__':
 	if len(sys.argv) < 3:
 		exit(1)
 
+	# loading the server's private key from a file
 	with open(f'sk{int(sys.argv[1])}.pem', 'rb') as pem:
 	    pemlines = pem.read()
 	private_key = load_pem_private_key(pemlines, None, default_backend())
 
+	# starting the server
 	server = mix_server(private_key)
 	server.start('localhost', int(sys.argv[2]))
 
