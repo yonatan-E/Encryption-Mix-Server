@@ -60,16 +60,15 @@ class producer_client:
 				)
 			)
 
-<<<<<<< HEAD
+		# locking the mutex
 		self.__lock.acquire()
-=======
 		# appending the message to the pending messages queue
->>>>>>> 34bf979dc7aae6f25188201cb8fe8dc64da57ff2
 		self.__messages_queue.append({
 			'content': ciphertext,
 			'address': servers[0]['address'],
 			'remaining-rounds': message_json['round']
 		})
+		# locking the mutex
 		self.__lock.release()
 
 		return ciphertext
@@ -80,11 +79,9 @@ class producer_client:
 
 		new_messages_queue = []
 
-<<<<<<< HEAD
+		# locking the mutex
 		self.__lock.acquire()
-=======
 		# sending all of the pending messages which their remaining rounds count is 0
->>>>>>> 34bf979dc7aae6f25188201cb8fe8dc64da57ff2
 		for message in self.__messages_queue:
 
 			if message['remaining-rounds'] == 0:
@@ -94,6 +91,7 @@ class producer_client:
 				new_messages_queue.append(message)
 
 		self.__messages_queue = new_messages_queue
+		# releasing the mutex
 		self.__lock.release()
 
 def generate_message_json(line, servers): # servers is a list of tuples (IP, PORT)

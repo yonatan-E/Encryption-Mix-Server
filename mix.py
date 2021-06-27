@@ -48,15 +48,14 @@ class mix_server:
 			)
 		)
 
-<<<<<<< HEAD
+		# locking the mutex
 		self.__lock.acquire()
-=======
 		# appending the message to the sending queue
->>>>>>> 34bf979dc7aae6f25188201cb8fe8dc64da57ff2
 		self.__messages_queue.append({
 			'address': (socket.inet_ntoa(plaintext[0:4]), int.from_bytes(plaintext[4:6], 'big')),
 			'content': plaintext[6:]
 		})
+		# releasing the mutex
 		self.__lock.release()
 
 	def __send_messages(self):
@@ -64,17 +63,16 @@ class mix_server:
 			# sleeping for a time interval
 			time.sleep(self.MESSAGE_SENDING_INTERVAL)
 
-<<<<<<< HEAD
+			# locking the mutex
 			self.__lock.acquire()
-=======
 			# shuffeling the pending messages queue
->>>>>>> 34bf979dc7aae6f25188201cb8fe8dc64da57ff2
 			random.shuffle(self.__messages_queue)
 			# sending all of the pending messages in the sending queue
 			for message in self.__messages_queue:
 				self.__sock.sendto(message['content'], message['address'])
 
 			self.__messages_queue = []
+			# releasing the mutex
 			self.__lock.release()
 
 if __name__ == '__main__':
