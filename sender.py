@@ -21,6 +21,8 @@ class producer_client:
 	def __init__(self):
 		self.__messages_queue = []
 
+		self.__lock = threading.Lock()
+
 	def start(self):
 		self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -50,11 +52,13 @@ class producer_client:
 				)
 			)
 
+		self.__lock.acquire()
 		self.__messages_queue.append({
 			'content': ciphertext,
 			'address': servers[0]['address'],
 			'remaining-rounds': message_json['round']
 		})
+		self.__lock.release()
 
 		return ciphertext
 
@@ -63,6 +67,7 @@ class producer_client:
 
 		new_messages_queue = []
 
+		self.__lock.acquire()
 		for message in self.__messages_queue:
 
 			if message['remaining-rounds'] == 0:
@@ -72,7 +77,7 @@ class producer_client:
 				new_messages_queue.append(message)
 
 		self.__messages_queue = new_messages_queue
-
+		self.__lock.release()
 
 def generate_message_json(line, servers): # servers is a list of tuples (IP, PORT)
 	message = {}

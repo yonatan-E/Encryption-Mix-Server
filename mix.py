@@ -19,6 +19,8 @@ class mix_server:
 		self.__private_key = private_key
 		self.__messages_queue = []
 
+		self.__lock = threading.Lock()
+
 	def start(self, ip, port):
 		self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.__sock.bind((ip, port))
@@ -42,20 +44,24 @@ class mix_server:
 			)
 		)
 
+		self.__lock.acquire()
 		self.__messages_queue.append({
 			'address': (socket.inet_ntoa(plaintext[0:4]), int.from_bytes(plaintext[4:6], 'big')),
 			'content': plaintext[6:]
 		})
+		self.__lock.release()
 
 	def __send_messages(self):
 		while True:
 			time.sleep(self.MESSAGE_SENDING_INTERVAL)
 
+			self.__lock.acquire()
 			random.shuffle(self.__messages_queue)
 			for message in self.__messages_queue:
 				self.__sock.sendto(message['content'], message['address'])
 
 			self.__messages_queue = []
+			self.__lock.release()
 
 if __name__ == '__main__':
 	if len(sys.argv) < 3:
