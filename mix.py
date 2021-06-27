@@ -48,13 +48,13 @@ class mix_server:
 			)
 		)
 
-	def append_to_queue(self, message):
+	def append_to_queue(self, message, address):
 		# locking the mutex
 		self.__lock.acquire()
 		# appending the message to the sending queue
 		self.__messages_queue.append({
-			'address': (socket.inet_ntoa(plaintext[0:4]), int.from_bytes(plaintext[4:6], 'big')),
-			'content': plaintext[6:]
+			'address': address,
+			'content': message
 		})
 		# releasing the mutex
 		self.__lock.release()
@@ -88,4 +88,4 @@ if __name__ == '__main__':
 
 	while True:
 		message = server.recieve_message()
-		server.append_to_queue(message)
+		server.append_to_queue(message[6:], (socket.inet_ntoa(message[0:4]), int.from_bytes(message[4:6], 'big')))

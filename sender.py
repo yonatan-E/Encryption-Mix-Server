@@ -144,5 +144,5 @@ if __name__ == '__main__':
 		client.append_to_queue(generate_message_json(message, servers))
 
 	client.send_pending_messages()
-	client.close()
+	client.stop()
 		
