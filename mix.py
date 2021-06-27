@@ -39,7 +39,7 @@ class mix_server:
 		data, address = self.__sock.recvfrom(self.BUFFER_SIZE)
 
 		# decrypting the recieved message with the server's private key
-		plaintext = self.__private_key.decrypt(
+		return self.__private_key.decrypt(
 			data,
 			padding.OAEP(
 				mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -48,6 +48,7 @@ class mix_server:
 			)
 		)
 
+	def append_to_queue(self, message):
 		# locking the mutex
 		self.__lock.acquire()
 		# appending the message to the sending queue
@@ -60,9 +61,6 @@ class mix_server:
 
 	def __send_messages(self):
 		while True:
-			# sleeping for a time interval
-			time.sleep(self.MESSAGE_SENDING_INTERVAL)
-
 			# locking the mutex
 			self.__lock.acquire()
 			# shuffeling the pending messages queue
@@ -89,4 +87,5 @@ if __name__ == '__main__':
 	server.start('localhost', int(sys.argv[2]))
 
 	while True:
-		server.recieve_message()
+		message = server.recieve_message()
+		server.append_to_queue(message)

@@ -21,22 +21,18 @@ class producer_client:
 	def __init__(self):
 		self.__messages_queue = []
 
-		self.__lock = threading.Lock()
-
 	def start(self):
 		# opening a socket
 		self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-		# starting a thread to run in background and send the messages which their round count has reached to 0, every time interval
+		# this thread will run in background and send the messages which their round count has reached to 0, every time interval
 		self.__sender_thread = threading.Timer(self.MESSAGE_SENDING_INTERVAL, self.__send_messages)
-		self.__sender_thread.start()
 
 	def stop(self):
 		# closing the socket and canceling the thread
 		self.__sock.close()
-		self.__sender_thread.cancel()
 
-	def send_message(self, message_json): # message should be in format {content, servers (list of tuples (IP, PORT)), round, key, dest-addr (IP, PORT)}
+	def append_to_queue(self, message_json): # message should be in format {content, servers (list of tuples (IP, PORT)), round, key, dest-addr (IP, PORT)}
 		# encrypting the plaintext with the symetric key
 		ciphertext = Fernet(message_json['key']).encrypt(message_json['content'].encode())
 
@@ -60,27 +56,25 @@ class producer_client:
 				)
 			)
 
-		# locking the mutex
-		self.__lock.acquire()
 		# appending the message to the pending messages queue
 		self.__messages_queue.append({
 			'content': ciphertext,
 			'address': servers[0]['address'],
 			'remaining-rounds': message_json['round']
 		})
-		# locking the mutex
-		self.__lock.release()
 
 		return ciphertext
 
+	def send_pending_messages(self):
+		self.__sender_thread.start()
+		self.__sender_thread.join()
+
 	def __send_messages(self):
-		# sleeping for a time interval
-		time.sleep(self.MESSAGE_SENDING_INTERVAL)
+		if len(self.__messages_queue) == 0:
+			self.__sender_thread.cancel()
 
 		new_messages_queue = []
 
-		# locking the mutex
-		self.__lock.acquire()
 		# sending all of the pending messages which their remaining rounds count is 0
 		for message in self.__messages_queue:
 
@@ -91,8 +85,6 @@ class producer_client:
 				new_messages_queue.append(message)
 
 		self.__messages_queue = new_messages_queue
-		# releasing the mutex
-		self.__lock.release()
 
 def generate_message_json(line, servers): # servers is a list of tuples (IP, PORT)
 	message = {}
@@ -149,5 +141,8 @@ if __name__ == '__main__':
 	client.start()
 	
 	for message in messages:
-		client.send_message(generate_message_json(message, servers))
+		client.append_to_queue(generate_message_json(message, servers))
+
+	client.send_pending_messages()
+	client.close()
 		
