@@ -19,7 +19,7 @@ class mix_server:
 		self.__private_key = private_key
 		self.__messages_queue = []
 
-		self.__lock = threading.Lock()
+		self.__sending_thread_running = False
 
 	def start(self, ip, port):
 		# opening a socket and binding it
@@ -27,13 +27,17 @@ class mix_server:
 		self.__sock.bind((ip, port))
 
 		# starting a thread to run in background and clear the messages queue every time interval
-		self.__sender_thread = threading.Timer(self.MESSAGE_SENDING_INTERVAL, self.__send_messages)
+		self.__sending_thread_running = True
+		self.__sender_thread = threading.Thread(target=self.__send_messages)
 		self.__sender_thread.start()
 
+		# this mutex will prevent race conditions on the messages queue
+		self.__lock = threading.Lock()
+
 	def stop(self):
-		# closing the socket and canceling the thread
+		# closing the socket and stopping the thread
 		self.__sock.close()
-		self.__sender_thread.cancel()
+		self.__sending_thread_running = False
 
 	def recieve_message(self):
 		data, address = self.__sock.recvfrom(self.BUFFER_SIZE)
@@ -60,18 +64,21 @@ class mix_server:
 		self.__lock.release()
 
 	def __send_messages(self):
-		while True:
-			# locking the mutex
-			self.__lock.acquire()
-			# shuffeling the pending messages queue
-			random.shuffle(self.__messages_queue)
-			# sending all of the pending messages in the sending queue
-			for message in self.__messages_queue:
-				self.__sock.sendto(message['content'], message['address'])
+		while self.__sending_thread_running:
+			if len(self.__messages_queue) > 0:
+				# locking the mutex
+				self.__lock.acquire()
+				# shuffeling the pending messages queue
+				random.shuffle(self.__messages_queue)
+				# sending all of the pending messages in the sending queue
+				for message in self.__messages_queue:
+					self.__sock.sendto(message['content'], message['address'])
 
-			self.__messages_queue = []
-			# releasing the mutex
-			self.__lock.release()
+				self.__messages_queue = []
+				# releasing the mutex
+				self.__lock.release()
+
+			time.sleep(self.MESSAGE_SENDING_INTERVAL)
 
 if __name__ == '__main__':
 	if len(sys.argv) < 3:

@@ -21,18 +21,26 @@ class producer_client:
 	def __init__(self):
 		self.__messages_queue = []
 
+		self.__sending_thread_running = False
+
 	def start(self):
 		# opening a socket
 		self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 		# this thread will run in background and send the messages which their round count has reached to 0, every time interval
-		self.__sender_thread = threading.Timer(self.MESSAGE_SENDING_INTERVAL, self.__send_messages)
+		self.__sending_thread_running = True
+		self.__sender_thread = threading.Thread(target=self.__send_messages)
+		self.__sender_thread.start()
+
+		# this mutex will prevent race conditions on the messages queue
+		self.__lock = threading.Lock()
 
 	def stop(self):
-		# closing the socket and canceling the thread
+		# closing the socket and stopping the thread
 		self.__sock.close()
+		self.__sending_thread_running = False
 
-	def append_to_queue(self, message_json): # message should be in format {content, servers (list of tuples (IP, PORT)), round, key, dest-addr (IP, PORT)}
+	def append_to_message_queue(self, message_json): # message should be in format {content, servers (list of tuples (IP, PORT)), round, key, dest-addr (IP, PORT)}
 		# encrypting the plaintext with the symetric key
 		ciphertext = Fernet(message_json['key']).encrypt(message_json['content'].encode())
 
@@ -56,35 +64,44 @@ class producer_client:
 				)
 			)
 
+		# locking the mutex
+		self.__lock.acquire()
 		# appending the message to the pending messages queue
 		self.__messages_queue.append({
 			'content': ciphertext,
 			'address': servers[0]['address'],
 			'remaining-rounds': message_json['round']
 		})
+		# releasing the mutex
+		self.__lock.release()
 
 		return ciphertext
 
-	def send_pending_messages(self):
-		self.__sender_thread.start()
-		self.__sender_thread.join()
+	def flush_messages_queue(self):
+		while len(self.__messages_queue) > 0:
+			time.sleep(self.MESSAGE_SENDING_INTERVAL)
 
 	def __send_messages(self):
-		if len(self.__messages_queue) == 0:
-			self.__sender_thread.cancel()
+		while self.__sending_thread_running:
+			if len(self.__messages_queue) > 0:
+				new_messages_queue = []
 
-		new_messages_queue = []
+				# locking the mutex
+				self.__lock.acquire()
+				# sending all of the pending messages which their remaining rounds count is 0
+				for message in self.__messages_queue:
 
-		# sending all of the pending messages which their remaining rounds count is 0
-		for message in self.__messages_queue:
+					if message['remaining-rounds'] == 0:
+						self.__sock.sendto(message['content'], message['address'])
+					else:
+						message['remaining-rounds'] -= 1
+						new_messages_queue.append(message)
 
-			if message['remaining-rounds'] == 0:
-				self.__sock.sendto(message['content'], message['address'])
-			else:
-				message['remaining-rounds'] -= 1
-				new_messages_queue.append(message)
+				self.__messages_queue = new_messages_queue
+				# releasing the mutex
+				self.__lock.release()
 
-		self.__messages_queue = new_messages_queue
+			time.sleep(self.MESSAGE_SENDING_INTERVAL)
 
 def generate_message_json(line, servers): # servers is a list of tuples (IP, PORT)
 	message = {}
@@ -141,8 +158,8 @@ if __name__ == '__main__':
 	client.start()
 	
 	for message in messages:
-		client.append_to_queue(generate_message_json(message, servers))
+		client.append_to_message_queue(generate_message_json(message, servers))
 
-	client.send_pending_messages()
+	client.flush_messages_queue()
 	client.stop()
 		
